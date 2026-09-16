@@ -86,7 +86,7 @@ rollout_steps = 4       # predict this many future points inside EACH training l
 physics_weight = 0.01  # dimensionless; 0.0 disables physics, keeping all else the same
 
 if block_size < 2 or rollout_steps < 3 or block_size + rollout_steps > len(train['time']):
-    raise ValueError(f'Require block_size >= 2, rollout_steps >= 3, and their sum <= {len(train['time'])}')
+    raise ValueError(f"Require block_size >= 2, rollout_steps >= 3, and their sum <= {len(train['time'])}")
 
 model_rng = np.random.default_rng(42) # Let there be order among chaos
 matrix = lambda nout, nin, std=0.08: jnp.array(model_rng.normal(0.0, std, size=(nout, nin)))
