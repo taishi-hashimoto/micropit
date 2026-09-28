@@ -39,10 +39,16 @@ Modify `acceleration_weight` in `micropit.py` to see the effect of the accelerat
 
 `velocity_weight` adds a supervised velocity loss using differences between consecutive predicted positions and consecutive clean target positions, divided by `dt`.
 Velocities are normalized by `sqrt(g * position_scale)` before computing the MSE.
-Set `velocity_weight = 0.0` and `acceleration_weight = 0.0` to disable phyisics.
+Set `velocity_weight = 0.0` and `acceleration_weight = 0.0` to disable physics.
 Output folders include both weights so comparisons are saved separately.
 
 The default training budget is 10,000 updates, configured by `num_steps` in `micropit.py`.
+
+Training uses 1,000 synthetic trajectories with noisy observations.
+At each update, a window of 14 consecutive noisy observations is selected at a random starting position, and the model autoregressively predicts the next 12 positions.
+The position and velocity losses use the corresponding noise-free targets, while the acceleration loss encourages predicted acceleration to match `(0, -g)`.
+
+During inference, the first 14 noisy observations of a new trajectory are used to autoregressively predict the remaining 26 positions, without receiving future observations.
 
 ## Example Output
 
