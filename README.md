@@ -39,3 +39,7 @@ Modify `physics_weight` in `micropit.py` to see the effect of physics-informed l
 | Physics OFF<br>(physics_weight = 0.00) | Physics ON<br>(physics_weight = 0.025) |
 |-------------|------------|
 | ![Physics OFF](docs/fig/trajectory_0.00.png) | ![Physics ON](docs/fig/trajectory_0.025.png) |
+
+## License
+
+Licensed under the [MIT License](LICENSE).
