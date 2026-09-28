@@ -1,6 +1,6 @@
 # microPIT: micro Physics-Informed Transformer
 
-Based on microgpt_jax.py; original scalar microgpt: @karpathy.
+Based on [microgpt by Andrej Karpathy](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95).
 
 A minimal implementation of a physics-informed transformer for projectile motion prediction.
 

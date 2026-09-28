@@ -1,6 +1,6 @@
 """
 A JAX rewrite of the scalar microgpt, keeping the original script layout.
-Original scalar version: @karpathy (the code supplied in this conversation).
+Original scalar version: @karpathy (https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95).
 Whole-sequence attention replaces the sequential KV cache; all else stays local.
 """
 
