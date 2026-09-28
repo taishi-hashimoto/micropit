@@ -5,7 +5,6 @@ Based on microgpt_jax.py; original scalar microgpt: @karpathy (https://gist.gith
 Task: noisy past positions -> future positions, for a previously unseen throw.
 The model does NOT receive the initial velocity or future observations.
 Physics is a soft finite-difference loss, not a built-in ballistic solver.
-Set physics_weight = 0.0 for the same model without the physics loss.
 
 Run:
     python micropit.py
@@ -21,7 +20,9 @@ import matplotlib
 matplotlib.use('Agg') # save figures even on a server without a display
 import matplotlib.pyplot as plt
 
-seed = None
+seed = 202609
+acceleration_weight = 0.025  # dimensionless; 0.0 disables acceleration matching
+velocity_weight = 0.025  # dimensionless; 0.0 disables supervised velocity matching
 
 # Shared physical settings for data generation, training, and evaluation.
 g = 9.8   # m/s^2; supplied gravitational acceleration
@@ -75,6 +76,7 @@ n_channel = 2        # x and y
 # Convert positions from SI units to dimensionless values using a precomputed scale.
 # Use the RMS of training observations (m) as the shared scale.
 position_scale = float(np.sqrt(np.mean(train['observed'] ** 2)))
+velocity_scale = float(np.sqrt(g * position_scale)) # m/s; characteristic gravitational speed
 
 # Initialize the parameters, to store the knowledge of the model
 n_layer = 1     # depth of the transformer neural network (number of layers)
@@ -85,7 +87,6 @@ if n_layer < 1 or n_head <= 0 or n_embd <= 0 or n_embd % n_head:
 head_dim = n_embd // n_head # derived dimension of each head
 block_size = 14  # number of PAST positions supplied at each prediction
 rollout_steps = 12      # predict this many future points inside EACH training loss
-physics_weight = 0.025  # dimensionless; 0.0 disables physics, keeping all else the same
 
 if block_size < 2 or rollout_steps < 3 or block_size + rollout_steps > len(train['time']):
     raise ValueError(f"Require block_size >= 2, rollout_steps >= 3, and their sum <= {len(train['time'])}")
@@ -169,16 +170,20 @@ def rollout(state_dict, tokens, steps):
         tokens = jnp.concatenate([tokens[1:], prediction[None, :]], axis=0)
     return jnp.stack(sample) # (steps, 2), all model-generated
 
-def loss_fn(state_dict, tokens, targets, physics_weight):
+def loss_fn(state_dict, tokens, targets, acceleration_weight, velocity_weight):
     # (rollout_steps, 2), all model-generated
     prediction = rollout(state_dict, tokens, rollout_steps)
     # Supervised data loss: predict CLEAN positions from a NOISY past window.
     data_loss = jnp.mean((prediction - targets) ** 2)
-    # Physical residual on predicted points ONLY; no noisy seed points mixed in.
+    # Match interval velocities to CLEAN targets; use future points only, as below.
+    predicted_velocity = (prediction[1:] - prediction[:-1]) * position_scale / dt
+    target_velocity = (targets[1:] - targets[:-1]) * position_scale / dt
+    velocity_loss = jnp.mean(((predicted_velocity - target_velocity) / velocity_scale) ** 2)
+    # Acceleration residual on predicted points ONLY; no noisy seed points mixed in.
     acceleration = (prediction[2:] - 2 * prediction[1:-1] + prediction[:-2]) * position_scale / dt**2
-    physics_loss = jnp.mean(((acceleration - jnp.array([0.0, -g])) / g) ** 2)
-    loss = data_loss + physics_weight * physics_loss
-    return loss, (data_loss, physics_loss)
+    acceleration_loss = jnp.mean(((acceleration - jnp.array([0.0, -g])) / g) ** 2)
+    loss = data_loss + velocity_weight * velocity_loss + acceleration_weight * acceleration_loss
+    return loss, (data_loss, velocity_loss, acceleration_loss)
 
 loss_and_grad = jax.jit(jax.value_and_grad(loss_fn, has_aux=True))
 
@@ -188,7 +193,7 @@ m = {i: jnp.zeros_like(p) for i, p in params.items()}
 v = {i: jnp.zeros_like(p) for i, p in params.items()}
 
 # Repeat in sequence
-num_steps = 2000 # training updates, NOT epochs
+num_steps = 10000 # training updates, NOT epochs
 # random training-window selection; separate from data generation
 rng = np.random.default_rng(seed)
 order = np.arange(len(train['clean']))
@@ -203,7 +208,8 @@ for step in range(num_steps):
     targets = jnp.array(train['clean'][trajectory_idx, start+block_size:start+block_size+rollout_steps] / position_scale)
 
     # Differentiate through ALL rollout steps; no stop_gradient/detach.
-    (loss, (data_loss, physics_loss)), grads = loss_and_grad(state_dict, tokens, targets, physics_weight)
+    (loss, (data_loss, velocity_loss, acceleration_loss)), grads = loss_and_grad(
+        state_dict, tokens, targets, acceleration_weight, velocity_weight)
 
     # Adam optimizer update: update the model parameters based on the corresponding gradients
     lr_t = learning_rate * (1 - step / num_steps)
@@ -214,10 +220,10 @@ for step in range(num_steps):
         v_hat = v[i] / (1 - beta2 ** (step + 1))
         params[i] = p - lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
 
-    loss, data_loss, physics_loss = map(float, (loss, data_loss, physics_loss))
+    loss, data_loss, velocity_loss, acceleration_loss = map(float, (loss, data_loss, velocity_loss, acceleration_loss))
     data_losses.append(data_loss)
     if (step + 1) % 100 == 0 or step == 0:
-        print(f"step {step+1:4d} / {num_steps:4d} | loss {loss:.6f} | data {data_loss:.6f} | physics {physics_loss:.6f}")
+        print(f"step {step+1:4d} / {num_steps:4d} | loss {loss:.6f} | data {data_loss:.6f} | velocity {velocity_loss:.6f} | acceleration {acceleration_loss:.6f}")
 
 # Inference: forecast future positions for an unseen throw.
 # Initial velocity for a NEW synthetic test case.
@@ -246,7 +252,7 @@ acceleration_rmse = np.sqrt(np.mean(np.sum(residual**2, axis=-1)))
 print(f"estimated: position RMSE {position_rmse:.4f} m | final {final_position_rmse:.4f} m | acceleration residual {acceleration_rmse:.4f} m/s^2")
 
 # Save figures for the training loss and estimated trajectory.
-output_dir = f'micropit_results/physics_{physics_weight:g}'
+output_dir = f'micropit_results/acceleration_{acceleration_weight:g}_velocity_{velocity_weight:g}'
 os.makedirs(output_dir, exist_ok=True)
 
 # 1) Training progress: unweighted data loss.
@@ -255,7 +261,7 @@ width = min(100, len(data_losses))
 averaged = np.convolve(data_losses, np.ones(width) / width, mode='valid')
 fig, ax = plt.subplots(figsize=(8.4, 5.0), layout='constrained')
 ax.semilogy(np.arange(width, num_steps + 1), averaged, marker='.' if len(averaged) == 1 else None,
-            label=f'microPIT, physics_weight={physics_weight:g}')
+            label=f'microPIT, acceleration={acceleration_weight:g}, velocity={velocity_weight:g}')
 ax.set(xlabel='Training update', ylabel='Dimensionless data loss',
        title=f'Training data loss ({width}-update moving mean)')
 ax.legend(fontsize=9)
@@ -277,7 +283,7 @@ fig, ax = plt.subplots(figsize=(8.4, 5.3), layout='constrained')
 ax.plot(clean[:, 0], clean[:, 1], '--', label='True trajectory')
 ax.scatter(observed[:, 0], observed[:, 1], s=24, label='Observed sequence (model input)')
 ax.plot(prediction[:, 0], prediction[:, 1], 'o-', markersize=3,
-        label=f'Forecast by microPIT, physics_weight={physics_weight:g}')
+        label=f'Forecast by microPIT, acceleration={acceleration_weight:g}, velocity={velocity_weight:g}')
 ax.plot(fit[:, 0], fit[:, 1], ':', label='Reference from Known-g least-squares fit')
 vx0, vy0 = initial_velocity
 ax.set(xlabel='x (m)', ylabel='y (m)',
