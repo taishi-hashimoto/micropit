@@ -10,6 +10,11 @@ A minimal implementation of a physics-informed transformer for projectile motion
 - [microgpt_jax.py](microgpt_jax.py): JAX rewrite of `microgpt.py`.
 - [micropit.py](micropit.py): An example implementation of a physics-informed transformer for projectile motion prediction.
 
+## Disclaimer
+
+- This is a toy example for my learning purposes only.
+- The physics model here is a minimal implementation of the projectile motion with no air resistance nor ground collision. 
+
 ## Usage
 
 ```bash

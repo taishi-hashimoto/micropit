@@ -21,6 +21,8 @@ import matplotlib
 matplotlib.use('Agg') # save figures even on a server without a display
 import matplotlib.pyplot as plt
 
+seed = None
+
 # Shared physical settings for data generation, training, and evaluation.
 g = 9.8   # m/s^2; supplied gravitational acceleration
 dt = 0.05 # s between samples
@@ -63,7 +65,7 @@ def make_projectile_data(
 # Initial position (0, 1) m; initial velocities use the shared ranges.
 # NOTE: Ground collisions are not modeled; trajectories may extend below y = 0.
 noise_std = 0.05 # m; measurement noise, not a random force
-train = make_projectile_data(1000, noise_std=noise_std, seed=42)
+train = make_projectile_data(1000, noise_std=noise_std, seed=seed)
 # `clean` is available only because this is synthetic supervised training.
 print(f"num trajectories: {len(train['clean'])}")
 
@@ -82,13 +84,13 @@ if n_layer < 1 or n_head <= 0 or n_embd <= 0 or n_embd % n_head:
     raise ValueError('n_layer >= 1; n_embd must be positive and divisible by a positive n_head')
 head_dim = n_embd // n_head # derived dimension of each head
 block_size = 14  # number of PAST positions supplied at each prediction
-rollout_steps = 4       # predict this many future points inside EACH training loss
-physics_weight = 0.01  # dimensionless; 0.0 disables physics, keeping all else the same
+rollout_steps = 12      # predict this many future points inside EACH training loss
+physics_weight = 0.025  # dimensionless; 0.0 disables physics, keeping all else the same
 
 if block_size < 2 or rollout_steps < 3 or block_size + rollout_steps > len(train['time']):
     raise ValueError(f"Require block_size >= 2, rollout_steps >= 3, and their sum <= {len(train['time'])}")
 
-model_rng = np.random.default_rng(42) # Let there be order among chaos
+model_rng = np.random.default_rng(seed) # Let there be order among chaos
 matrix = lambda nout, nin, std=0.08: jnp.array(model_rng.normal(0.0, std, size=(nout, nin)))
 # wte projects input positions; lm_head predicts the change in position.
 state_dict = {'wte': matrix(n_embd, n_channel), 'wpe': matrix(block_size, n_embd), 'lm_head': matrix(n_channel, n_embd)}
@@ -188,7 +190,7 @@ v = {i: jnp.zeros_like(p) for i, p in params.items()}
 # Repeat in sequence
 num_steps = 2000 # training updates, NOT epochs
 # random training-window selection; separate from data generation
-rng = np.random.default_rng(42)
+rng = np.random.default_rng(seed)
 order = np.arange(len(train['clean']))
 rng.shuffle(order)
 data_losses = []
@@ -226,7 +228,7 @@ if not (vx0_range[0] <= initial_velocity[0] <= vx0_range[1]
 time = train['time']
 future_time = time[block_size:]
 clean = np.stack([initial_velocity[0] * time, 1.0 + initial_velocity[1] * time - 0.5 * g * time**2], axis=-1)
-observed = clean[:block_size] + np.random.default_rng(2026).normal(0.0, noise_std, size=(block_size, n_channel))
+observed = clean[:block_size] + np.random.default_rng(seed).normal(0.0, noise_std, size=(block_size, n_channel))
 print(f'\n--- inference (only the first block_size (= {block_size}) observations are supplied, forecasting {len(future_time)} time steps) ---')
 print(f"observed: {time[0]:.2f}..{time[block_size-1]:.2f} s; forecast: {time[block_size]:.2f}..{time[-1]:.2f} s")
 
