@@ -266,7 +266,7 @@ ax.set(xlabel='Training update', ylabel='Dimensionless data loss',
        title=f'Training data loss ({width}-update moving mean)')
 ax.legend(fontsize=9)
 ax.grid(True, alpha=0.25)
-fig.savefig(os.path.join(output_dir, 'training_loss.png'), dpi=180)
+fig.savefig(os.path.join(output_dir, 'training_loss.png'))
 plt.close(fig)
 
 # 2) Trajectory forecast: compare the model's prediction to the true trajectory and a reference least-squares fit.
@@ -293,7 +293,7 @@ ax.set(xlabel='x (m)', ylabel='y (m)',
 ax.set_aspect('equal', adjustable='datalim')
 ax.legend(fontsize=9, loc='best')
 ax.grid(True, alpha=0.25)
-fig.savefig(os.path.join(output_dir, 'trajectory.png'), dpi=180)
+fig.savefig(os.path.join(output_dir, 'trajectory.png'))
 plt.close(fig)
 
 print(f"Saved {output_dir}/training_loss.png and {output_dir}/trajectory.png")
