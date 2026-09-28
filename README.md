@@ -20,7 +20,13 @@ source venv/bin/activate  # Linux/macOS
 # Install dependencies: jax, numpy, and matplotlib
 pip install -r requirements.txt
 
-# Run the physics-informed transformer
+# Run the original microgpt implementation
+python microgpt.py
+
+# Run the JAX rewrite of microgpt
+python microgpt_jax.py
+
+# Run the physics-informed transformer example
 python micropit.py
 ```
 
