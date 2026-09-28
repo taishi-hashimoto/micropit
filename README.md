@@ -35,15 +35,23 @@ python microgpt_jax.py
 python micropit.py
 ```
 
+Modify `acceleration_weight` in `micropit.py` to see the effect of the acceleration loss, which encourages acceleration `(0, -g)`, on the predicted trajectory.
+
+`velocity_weight` adds a supervised velocity loss using differences between consecutive predicted positions and consecutive clean target positions, divided by `dt`.
+Velocities are normalized by `sqrt(g * position_scale)` before computing the MSE.
+Set `velocity_weight = 0.0` and `acceleration_weight = 0.0` to disable phyisics.
+Output folders include both weights so comparisons are saved separately.
+
+The default training budget is 10,000 updates, configured by `num_steps` in `micropit.py`.
+
 ## Example Output
 
-Modify `physics_weight` in `micropit.py` to see the effect of physics-informed loss on the predicted trajectory.
+> NOTE: Values below may not be optimal.
 
-> NOTE: Value below may not be the optimal setting.
-
-| Physics OFF<br>(physics_weight = 0.00) | Physics ON<br>(physics_weight = 0.025) |
+| Physics OFF | Physics ON |
 |-------------|------------|
 | ![Physics OFF](docs/fig/trajectory_0.00.png) | ![Physics ON](docs/fig/trajectory_0.025.png) |
+| acceleration_weight = 0.00<br>velocity_weight = 0.00 | acceleration_weight = 0.025<br>velocity_weight = 0.025 |
 
 ## License
 
