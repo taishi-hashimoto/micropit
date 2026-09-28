@@ -12,7 +12,7 @@ A minimal implementation of a physics-informed transformer for projectile motion
 
 ## Disclaimer
 
-- This is a toy example for my learning purposes only.
+- This is a toy example for learning purposes only.
 - The physics model here is a minimal implementation of the projectile motion with no air resistance nor ground collision. 
 
 ## Usage
